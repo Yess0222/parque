@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Yess Park</title>
+    <title>Yess Park - VR Edition</title>
 
     <link
       rel="icon"
@@ -44,14 +44,12 @@
       <canvas id="experience-canvas"></canvas>
     </div>
 
-    <!-- Loading Screen -->
     <div class="loading-screen" id="loadingScreen">
       <div class="loading-text">Loading...</div>
       <button class="enter-button">Enter Park!</button>
       <div class="instructions">~ use arrow keys to move ~</div>
     </div>
 
-    <!-- Theme Toggle -->
     <div class="theme-mode-toggle-button">
       <svg
         width="80"
@@ -157,7 +155,6 @@
       </svg>
     </div>
 
-    <!-- Pop-up Modals -->
     <div class="modal-bg-overlay hidden"></div>
     <div class="modal hidden">
       <div class="modal-wrapper">
@@ -197,7 +194,6 @@
       </div>
     </div>
 
-    <!-- Mobile controls -->
     <div class="mobile-control up-arrow">
       <svg
         width="45"
@@ -429,7 +425,8 @@
       </svg>
     </div>
 
-    <!-- Added for import map support -->
+    <div id="vr-button-container"></div>
+
     <script
       async
       src="https://unpkg.com/es-module-shims@1.0.1/dist/es-module-shims.js"
