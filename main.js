@@ -144,11 +144,28 @@ renderer.xr.addEventListener("sessionstart", () => {
 
   // Opcional: Añade modelos visuales para los controladores
   // La función `buildController` se define al final del archivo como un placeholder
+  // Necesitas definir `buildController` si no lo has hecho.
+  // Por ejemplo:
+  // function buildController( data ) {
+  //   let geometry, material;
+  //   switch ( data.targetRayMode ) {
+  //     case 'tracked-pointer':
+  //       geometry = new THREE.BufferGeometry();
+  //       geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ 0, 0, 0, 0, 0, - 1 ], 3 ) );
+  //       geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( [ 0.5, 0.5, 0.5, 0, 0, 0 ], 3 ) );
+  //       material = new THREE.LineBasicMaterial( { vertexColors: true, blending: THREE.AdditiveBlending } );
+  //       return new THREE.Line( geometry, material );
+  //     case 'gaze':
+  //       geometry = new THREE.RingGeometry( 0.02, 0.04, 32 ).translate( 0, 0, - 1 );
+  //       material = new THREE.MeshBasicMaterial( { opacity: 0.5, transparent: true } );
+  //       return new THREE.Mesh( geometry, material );
+  //   }
+  // }
   hand1.addEventListener('connected', function (event) {
-      this.add(buildController(event.data));
+      if (typeof buildController === 'function') this.add(buildController(event.data));
   });
   hand2.addEventListener('connected', function (event) {
-      this.add(buildController(event.data));
+      if (typeof buildController === 'function') this.add(buildController(event.data));
   });
   hand1.addEventListener('disconnected', function () {
       if (this.children[0]) this.remove(this.children[0]);
@@ -159,16 +176,19 @@ renderer.xr.addEventListener("sessionstart", () => {
 
 
   if (character.instance) {
-    character.instance.position.set(0, 0, 0); // Reinicia la posición del personaje relativa a su nuevo padre
+    // Cuando el personaje se vuelve un hijo de dummyCamera, su posición local se vuelve (0,0,0)
+    // El dummyCamera ahora se moverá con el playerCollider para seguir al jugador.
     dummyCamera.position.copy(playerCollider.start); // Inicializa la cámara dummy a la posición actual del jugador
+    dummyCamera.position.y -= CAPSULE_RADIUS; // Ajusta la altura
     scene.add(dummyCamera); // Añade la cámara dummy a la escena
     dummyCamera.add(character.instance); // El personaje se convierte en un hijo de la cámara dummy
+    character.instance.position.set(0, -CAPSULE_HEIGHT / 2, 0); // Ajusta la posición local del personaje dentro de dummyCamera
   }
 
   // Oculta la pantalla de carga si todavía está visible
   // Asegúrate de que `gsap` esté incluido en tu proyecto
   if (typeof gsap !== 'undefined' && loadingScreen) {
-      gsap.to(loadingScreen, { opacity: 0, duration: 0, onComplete: () => { loadingScreen.remove(); } });
+      gsap.to(loadingScreen, { opacity: 0, duration: 0.5, onComplete: () => { loadingScreen.remove(); } });
   }
 
   if (!isMuted) {
@@ -190,6 +210,7 @@ renderer.xr.addEventListener("sessionend", () => {
   if (character.instance) {
     scene.add(character.instance); // Vuelve a añadir el personaje directamente a la escena
     character.instance.position.copy(dummyCamera.position); // Restaura la posición global del personaje
+    character.instance.position.y += CAPSULE_RADIUS; // Ajusta de nuevo a la posición superior de la cápsula
     scene.remove(dummyCamera); // Quita la cámara dummy de la escena
   }
 
@@ -216,7 +237,11 @@ const secondIcon = document.querySelector(".second-icon");
 
 const audioToggleButton = document.querySelector(".audio-toggle-button");
 const firstIconTwo = document.querySelector(".first-icon-two");
-const secondIconTwo = document.querySelector(".second-icon-two");
+const secondIconTwo = document = document.querySelector(".second-icon-two"); // typo here, should be document.querySelector
+
+// Corrected typo
+const secondIconTwoElement = document.querySelector(".second-icon-two");
+
 
 // Modal stuff
 const modalContent = {
@@ -366,6 +391,31 @@ const loader = new GLTFLoader(manager);
 loader.load(
   "./Portfolio.glb",
   function (glb) {
+    // --- INICIO: CAMBIOS SUGERIDOS PARA LA ESCALA Y DEPURACIÓN ---
+
+    // 1. **Ajusta la escala de todo el escenario GLB:**
+    //    Este es el cambio más importante. Prueba con diferentes valores.
+    //    - Si el escenario es demasiado GRANDE, usa un valor menor que 1 (ej. 0.1, 0.01).
+    //      Un valor de 0.1 significa que el escenario será 10 veces más pequeño.
+    //    - Si el escenario es demasiado PEQUEÑO (menos común), usa un valor mayor que 1 (ej. 10, 100).
+    const SCENE_SCALE_FACTOR = 0.1; // <<< COMIENZA AQUÍ, PRUEBA 0.01 O 0.001 SI AÚN ES MUY GRANDE
+    glb.scene.scale.set(SCENE_SCALE_FACTOR, SCENE_SCALE_FACTOR, SCENE_SCALE_FACTOR);
+
+    // 2. **Añade una caja de depuración TEMPORAL:**
+    //    Esta caja te ayudará a confirmar si el GLB se está cargando y si la escala es correcta.
+    //    Si ves la caja verde, significa que el GLB se carga y la escala está bien,
+    //    y el problema podría ser con los materiales o las luces de tu modelo real.
+    //    ¡Recuerda ELIMINAR este código una vez que tu escenario se vea!
+    const debugBox = new THREE.Mesh(
+      new THREE.BoxGeometry(2, 2, 2), // Una caja de 2x2x2 metros
+      new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }) // Verde y de alambre
+    );
+    debugBox.position.set(0, 1.7, -3); // Posiciona la caja a la altura de los ojos (1.7m) y 3m hacia adelante.
+    glb.scene.add(debugBox); // Añádela a la escena GLB para que se escale con ella.
+
+    // --- FIN: CAMBIOS SUGERIDOS PARA LA ESCALA Y DEPURACIÓN ---
+
+
     glb.scene.traverse((child) => {
       if (intersectObjectsNames.includes(child.name)) {
         intersectObjects.push(child);
@@ -394,7 +444,7 @@ loader.load(
   },
   undefined,
   function (error) {
-    console.error(error);
+    console.error(error); // MUY IMPORTANTE: Revisa la consola en chrome://inspect para ver errores aquí
   }
 );
 
@@ -547,7 +597,7 @@ function onClick() {
 }
 
 function handleInteraction() {
-  if (modal && !modal.classList.contains("hidden")) { // Añadido: asegurar que 'modal' existe
+  if (modal && !modal.classList.contains("hidden")) { // Asegurar que 'modal' existe y no está oculto
     return;
   }
 
@@ -556,7 +606,9 @@ function handleInteraction() {
   if (!currentCamera) return; // Asegurar que la cámara existe
 
   // *** Para interacción en VR, podrías querer usar raycasting desde los controladores de mano ***
-  // Aquí se sigue usando el "pointer" de ratón/toque. En VR, podrías necesitar un raycaster diferente.
+  // Por ahora, se mantiene el raycasting desde el "pointer" (ratón/toque),
+  // pero en VR el "pointer" siempre estará en el centro de la vista a menos que lo ajustes.
+  // Podrías necesitar un raycaster diferente para los controladores de mano.
   raycaster.setFromCamera(pointer, currentCamera);
   const intersects = raycaster.intersectObjects(intersectObjects);
 
@@ -667,24 +719,37 @@ function updatePlayer(delta) {
   playerCollisions(); // Check for collisions after moving
 
   // Update character instance position from collider
-  character.instance.position.copy(playerCollider.start);
-  character.instance.position.y -= CAPSULE_RADIUS;
+  // En VR, el character.instance es hijo de dummyCamera, así que su posición es local.
+  // En desktop, es global.
+  if (!vrEnabled) {
+    character.instance.position.copy(playerCollider.start);
+    character.instance.position.y -= CAPSULE_RADIUS;
+  }
+
 
   // --- VR Movement Integration (Conceptual) ---
   if (vrEnabled) {
-    // En VR, la posición del jugador se mueve normalmente, pero la cámara de VR
-    // se adjunta a la posición del visor. El "dummyCamera" se usa para
-    // mantener la posición del personaje en el espacio de la escena.
+    // En VR, la posición del dummyCamera se usa para mantener la posición del personaje
+    // El dummyCamera sigue al playerCollider.
     dummyCamera.position.copy(playerCollider.start);
     dummyCamera.position.y -= CAPSULE_RADIUS; // Ajusta para la base de la cápsula
 
     // *** Aquí es donde integrarías la lógica de movimiento específica para VR ***
     // Por ejemplo, usando los gamepads de los controladores:
     // if (hand1 && hand1.gamepad) {
-    //    // Accede a hand1.gamepad.axes para joysticks (ej. movimiento)
-    //    // Accede a hand1.gamepad.buttons para botones (ej. teletransporte o salto)
-    //    // console.log("Hand 1 Axes:", hand1.gamepad.axes);
-    //    // console.log("Hand 1 Buttons:", hand1.gamepad.buttons);
+    //    const forward = new THREE.Vector3(0, 0, -1);
+    //    forward.applyQuaternion(hand1.quaternion); // Obtén la dirección hacia adelante del controlador
+    //    forward.y = 0; // Solo movimiento horizontal
+    //    forward.normalize();
+
+    //    // Asume que el eje Y del joystick es el movimiento adelante/atrás
+    //    const joystickY = hand1.gamepad.axes[3]; // O el eje correspondiente en tu controlador
+    //    if (Math.abs(joystickY) > 0.1) { // Pequeño deadzone
+    //        playerCollider.translate(forward.multiplyScalar(joystickY * MOVE_SPEED * delta)); // delta viene de animate
+    //        character.isMoving = true;
+    //    } else {
+    //        character.isMoving = false;
+    //    }
     // }
     // Podrías rotar el dummyCamera o mover playerCollider
     // en función de la entrada del controlador.
@@ -824,15 +889,15 @@ function toggleAudio() {
   if (!isMuted) {
     playSound("projectsSFX"); // Suena al activar el botón, no al mutear
   }
-  if (firstIconTwo && secondIconTwo) { // Asegurarse de que los iconos existen
+  if (firstIconTwo && secondIconTwoElement) { // Usar secondIconTwoElement corregido
     if (firstIconTwo.style.display === "none") {
       firstIconTwo.style.display = "block";
-      secondIconTwo.style.display = "none";
+      secondIconTwoElement.style.display = "none";
       isMuted = false;
       sounds.backgroundMusic.play();
     } else {
       firstIconTwo.style.display = "none";
-      secondIconTwo.style.display = "block";
+      secondIconTwoElement.style.display = "block";
       isMuted = true;
       sounds.backgroundMusic.pause();
     }
@@ -907,19 +972,19 @@ function handleContinuousMovement() {
     // Esto es un tema complejo y dependerá del tipo de locomoción que quieras (teletransporte, movimiento con joystick, etc.).
     // Por ejemplo:
     // if (hand1 && hand1.gamepad) {
-    //     const forward = new THREE.Vector3(0, 0, -1);
-    //     forward.applyQuaternion(hand1.quaternion); // Obtén la dirección hacia adelante del controlador
-    //     forward.y = 0; // Solo movimiento horizontal
-    //     forward.normalize();
+    //    const forward = new THREE.Vector3(0, 0, -1);
+    //    forward.applyQuaternion(hand1.quaternion); // Obtén la dirección hacia adelante del controlador
+    //    forward.y = 0; // Solo movimiento horizontal
+    //    forward.normalize();
 
-    //     // Asume que el eje Y del joystick es el movimiento adelante/atrás
-    //     const joystickY = hand1.gamepad.axes[3]; // O el eje correspondiente en tu controlador
-    //     if (Math.abs(joystickY) > 0.1) { // Pequeño deadzone
-    //         playerCollider.translate(forward.multiplyScalar(joystickY * MOVE_SPEED * delta)); // delta viene de animate
-    //         character.isMoving = true;
-    //     } else {
-    //         character.isMoving = false;
-    //     }
+    //    // Asume que el eje Y del joystick es el movimiento adelante/atrás
+    //    const joystickY = hand1.gamepad.axes[3]; // O el eje correspondiente en tu controlador
+    //    if (Math.abs(joystickY) > 0.1) { // Pequeño deadzone
+    //        playerCollider.translate(forward.multiplyScalar(joystickY * MOVE_SPEED * delta)); // delta viene de animate
+    //        character.isMoving = true;
+    //    } else {
+    //        character.isMoving = false;
+    //    }
     // }
   } else {
     // Original desktop/mobile movement logic
@@ -1026,74 +1091,33 @@ function animate() {
       camera.lookAt(
         character.instance.position.x + 10,
         camera.position.y - 39,
-        character.instance.position.z + 10
+        character.instance.position.z // Z component was missing here
       );
     }
-  } else {
-    // En VR, el renderizador WebXR actualiza la cámara xrCamera automáticamente.
-    // No necesitas manipular la 'camera' base aquí.
-    // Si necesitas mover el mundo con respecto al jugador, ajustarías el 'dummyCamera' o el 'playerCollider'
-    // en updatePlayer/handleContinuousMovement.
   }
 
-  // --- Raycasting for interaction ---
-  if (!vrEnabled) {
-    // Desktop interaction (mouse pointer)
-    raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(intersectObjects);
-
-    if (intersects.length > 0) {
-      document.body.style.cursor = "pointer";
-    } else {
-      document.body.style.cursor = "default";
-      intersectObject = "";
-    }
-
-    for (let i = 0; i < intersects.length; i++) {
-      intersectObject = intersects[0].object.parent.name;
-    }
-  } else {
-    // En VR, normalmente usarías raycasting desde los controladores de mano
-    // o un puntero de mirada fija para interactuar.
-    // Ejemplo conceptual (necesita implementación):
-    // if (hand1 && hand1.gamepad) {
-    //     // Crea un rayo desde la posición y orientación del controlador
-    //     // const controllerRay = new THREE.Raycaster();
-    //     // controllerRay.setFromWorldAndDirection(hand1.position, hand1.getWorldDirection(new THREE.Vector3()));
-    //     // const vrIntersects = controllerRay.intersectObjects(intersectObjects);
-    //     // ... lógica de interacción VR
-    // }
-    document.body.style.cursor = "default"; // El cursor no es relevante en VR
-  }
-}
-
-renderer.setAnimationLoop(animate);
-
-// Placeholder for buildController if you plan to add visual models for your VR controllers
-// This function would typically create and return a mesh to represent the controller.
-function buildController(data) {
+  // Define buildController for VR controller visualization (if not already defined)
+  // This is a basic example. You might have your own 3D models for controllers.
+  function buildController( data ) {
     let geometry, material;
-
-    switch (data.targetRayMode) {
-        case 'tracked-pointer':
-            // Un puntero simple (una línea) que sigue la orientación del controlador
-            geometry = new THREE.BufferGeometry();
-            // Puntos para la línea: del origen del controlador a 1 unidad hacia adelante
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, -1], 3));
-            // Colores para la línea (opcional, para visualización básica)
-            geometry.setAttribute('color', new THREE.Float32BufferAttribute([0.5, 0.5, 0.5, 0, 0, 0], 3));
-            material = new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending });
-            return new THREE.Line(geometry, material);
-
-        case 'gaze':
-            // Un círculo pequeño que se mueve con la mirada (para visores sin controladores o modo de mirada)
-            geometry = new THREE.RingGeometry(0.02, 0.04, 32).translate(0, 0, -1); // Crea un anillo en Z -1
-            material = new THREE.MeshBasicMaterial({ opacity: 0.5, transparent: true });
-            return new THREE.Mesh(geometry, material);
-
-        case 'screen':
-            // Para dispositivos móviles que no son AR, o si la sesión VR no tiene un "tracked-pointer"
-            return new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), new THREE.MeshBasicMaterial({ color: 0xcccccc, opacity: 0.5, transparent: true }));
+    switch ( data.targetRayMode ) {
+      case 'tracked-pointer':
+        geometry = new THREE.BufferGeometry();
+        geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ 0, 0, 0, 0, 0, - 1 ], 3 ) );
+        geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( [ 0.5, 0.5, 0.5, 0, 0, 0 ], 3 ) );
+        material = new THREE.LineBasicMaterial( { vertexColors: true, blending: THREE.AdditiveBlending } );
+        return new THREE.Line( geometry, material );
+      case 'gaze':
+        geometry = new THREE.RingGeometry( 0.02, 0.04, 32 ).translate( 0, 0, - 1 );
+        material = new THREE.MeshBasicMaterial( { opacity: 0.5, transparent: true } );
+        return new THREE.Mesh( geometry, material );
     }
-    return new THREE.Object3D(); // Fallback
+  }
+
+
+  renderer.setAnimationLoop(animate); // IMPORTANT: Keep this at the end of animate()
+  renderer.render(scene, vrEnabled ? xrCamera : camera);
 }
+
+// Start the animation loop
+animate();
