@@ -1,24 +1,11 @@
 import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js"; // Keep for non-VR desktop fallback
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { Octree } from "three/addons/math/Octree.js";
 import { Capsule } from "three/addons/math/Capsule.js";
-// Import the VRButton for VR experiences
-import { VRButton } from "three/addons/webxr/VRButton.js"; // *** CAMBIO CLAVE: Usamos VRButton para Realidad Virtual ***
+import { VRButton } from "three/addons/webxr/VRButton.js"; // IMPORTANTE: Importa VRButton
 
-// --- VR Specific Imports and Variables ---
-let vrEnabled = false; // Flag to check if we are in VR mode
-let xrCamera; // This will be the VR camera provided by WebXR
-let playerControls; // To handle movement in VR, we'll need a different approach than keyboard/mouse
-const dummyCamera = new THREE.Object3D(); // A dummy object to represent the VR camera's position in the scene
-
-// DECLARE hand1 and hand2 here, but DON'T initialize them yet
-let hand1;
-let hand2;
-
-// Asegúrate de que Howl esté disponible globalmente o importado (si usas npm)
-// Por ejemplo, si lo incluyes desde un CDN en tu HTML:
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
+// --- Audio with Howler.js ---
 const sounds = {
   backgroundMusic: new Howl({
     src: ["./sfx/music.ogg"],
@@ -61,7 +48,7 @@ function stopSound(soundId) {
   }
 }
 
-//three.js setup
+// --- Three.js setup ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xaec972);
 const canvas = document.getElementById("experience-canvas");
@@ -107,119 +94,10 @@ renderer.shadowMap.enabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.7;
 
-// --- WebXR Enablement ---
-renderer.xr.enabled = true; // Crucial step to enable WebXR
-// *** CAMBIO CLAVE: Usa VRButton.createButton aquí ***
-if (document.getElementById("vr-button-container")) {
-  document.getElementById("vr-button-container").appendChild(
-    VRButton.createButton(renderer, {
-      sessionInit: {
-        optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"], // Características opcionales para una mejor experiencia VR
-      },
-    })
-  );
-}
+// --- CONFIGURACIÓN PARA VR ---
+renderer.xr.enabled = true; // ¡HABILITAR EL RENDERIZADOR PARA WEBXR!
 
-
-// Listen for VR session start and end
-renderer.xr.addEventListener("sessionstart", () => {
-  vrEnabled = true;
-  // Ocultar elementos de UI no relevantes en VR
-  if (document.querySelector(".theme-mode-toggle-button")) document.querySelector(".theme-mode-toggle-button").style.display = "none";
-  if (document.querySelector(".audio-toggle-button")) document.querySelector(".audio-toggle-button").style.display = "none";
-  if (document.querySelector(".mobile-control.up-arrow")) document.querySelector(".mobile-control.up-arrow").style.display = "none";
-  if (document.querySelector(".mobile-control.left-arrow")) document.querySelector(".mobile-control.left-arrow").style.display = "none";
-  if (document.querySelector(".mobile-control.right-arrow")) document.querySelector(".mobile-control.right-arrow").style.display = "none";
-  if (document.querySelector(".mobile-control.down-arrow")) document.querySelector(".mobile-control.down-arrow").style.display = "none";
-
-  xrCamera = renderer.xr.getCamera(camera); // Get the XR camera which will be controlling the view
-
-  // *** FIX: Inicializa los controladores de mano DESPUÉS de que la sesión VR comience ***
-  hand1 = renderer.xr.getController(0); // Para el controlador de la mano izquierda
-  hand2 = renderer.xr.getController(1); // Para el controlador de la mano derecha
-
-  // Añade los controladores a la escena para que su posición y orientación se actualicen
-  scene.add(hand1);
-  scene.add(hand2);
-
-  // Opcional: Añade modelos visuales para los controladores
-  // La función `buildController` se define al final del archivo como un placeholder
-  // Necesitas definir `buildController` si no lo has hecho.
-  // Por ejemplo:
-  // function buildController( data ) {
-  //   let geometry, material;
-  //   switch ( data.targetRayMode ) {
-  //     case 'tracked-pointer':
-  //       geometry = new THREE.BufferGeometry();
-  //       geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ 0, 0, 0, 0, 0, - 1 ], 3 ) );
-  //       geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( [ 0.5, 0.5, 0.5, 0, 0, 0 ], 3 ) );
-  //       material = new THREE.LineBasicMaterial( { vertexColors: true, blending: THREE.AdditiveBlending } );
-  //       return new THREE.Line( geometry, material );
-  //     case 'gaze':
-  //       geometry = new THREE.RingGeometry( 0.02, 0.04, 32 ).translate( 0, 0, - 1 );
-  //       material = new THREE.MeshBasicMaterial( { opacity: 0.5, transparent: true } );
-  //       return new THREE.Mesh( geometry, material );
-  //   }
-  // }
-  hand1.addEventListener('connected', function (event) {
-      if (typeof buildController === 'function') this.add(buildController(event.data));
-  });
-  hand2.addEventListener('connected', function (event) {
-      if (typeof buildController === 'function') this.add(buildController(event.data));
-  });
-  hand1.addEventListener('disconnected', function () {
-      if (this.children[0]) this.remove(this.children[0]);
-  });
-  hand2.addEventListener('disconnected', function () {
-      if (this.children[0]) this.remove(this.children[0]);
-  });
-
-
-  if (character.instance) {
-    // Cuando el personaje se vuelve un hijo de dummyCamera, su posición local se vuelve (0,0,0)
-    // El dummyCamera ahora se moverá con el playerCollider para seguir al jugador.
-    dummyCamera.position.copy(playerCollider.start); // Inicializa la cámara dummy a la posición actual del jugador
-    dummyCamera.position.y -= CAPSULE_RADIUS; // Ajusta la altura
-    scene.add(dummyCamera); // Añade la cámara dummy a la escena
-    dummyCamera.add(character.instance); // El personaje se convierte en un hijo de la cámara dummy
-    character.instance.position.set(0, -CAPSULE_HEIGHT / 2, 0); // Ajusta la posición local del personaje dentro de dummyCamera
-  }
-
-  // Oculta la pantalla de carga si todavía está visible
-  // Asegúrate de que `gsap` esté incluido en tu proyecto
-  if (typeof gsap !== 'undefined' && loadingScreen) {
-      gsap.to(loadingScreen, { opacity: 0, duration: 0.5, onComplete: () => { loadingScreen.remove(); } });
-  }
-
-  if (!isMuted) {
-    playSound("backgroundMusic");
-  }
-});
-
-renderer.xr.addEventListener("sessionend", () => {
-  vrEnabled = false;
-  // Mostrar elementos de UI de nuevo
-  if (document.querySelector(".theme-mode-toggle-button")) document.querySelector(".theme-mode-toggle-button").style.display = "block";
-  if (document.querySelector(".audio-toggle-button")) document.querySelector(".audio-toggle-button").style.display = "block";
-  if (document.querySelector(".mobile-control.up-arrow")) document.querySelector(".mobile-control.up-arrow").style.display = "block";
-  if (document.querySelector(".mobile-control.left-arrow")) document.querySelector(".mobile-control.left-arrow").style.display = "block";
-  if (document.querySelector(".mobile-control.right-arrow")) document.querySelector(".mobile-control.right-arrow").style.display = "block";
-  if (document.querySelector(".mobile-control.down-arrow")) document.querySelector(".mobile-control.down-arrow").style.display = "block";
-
-  // Revertir la relación padre-hijo del personaje
-  if (character.instance) {
-    scene.add(character.instance); // Vuelve a añadir el personaje directamente a la escena
-    character.instance.position.copy(dummyCamera.position); // Restaura la posición global del personaje
-    character.instance.position.y += CAPSULE_RADIUS; // Ajusta de nuevo a la posición superior de la cápsula
-    scene.remove(dummyCamera); // Quita la cámara dummy de la escena
-  }
-
-  // Remueve los controladores de la escena al finalizar la sesión VR
-  if (hand1) scene.remove(hand1);
-  if (hand2) scene.remove(hand2);
-});
-
-// Some of our DOM elements, others are scattered in the file
+// Algunos de nuestros elementos DOM, otros están dispersos en el archivo
 let isModalOpen = false;
 const modal = document.querySelector(".modal");
 const modalbgOverlay = document.querySelector(".modal-bg-overlay");
@@ -237,13 +115,9 @@ const secondIcon = document.querySelector(".second-icon");
 
 const audioToggleButton = document.querySelector(".audio-toggle-button");
 const firstIconTwo = document.querySelector(".first-icon-two");
-const secondIconTwo = document = document.querySelector(".second-icon-two"); // typo here, should be document.querySelector
+const secondIconTwo = document(".second-icon-two");
 
-// Corrected typo
-const secondIconTwoElement = document.querySelector(".second-icon-two");
-
-
-// Modal stuff
+// Modal stuff (sin cambios, ya definido)
 const modalContent = {
   Project_1: {
     title: "🍜Recipe Finder👩🏻‍🍳",
@@ -278,27 +152,25 @@ const modalContent = {
 function showModal(id) {
   const content = modalContent[id];
   if (content) {
-    if (modalTitle) modalTitle.textContent = content.title;
-    if (modalProjectDescription) modalProjectDescription.textContent = content.content;
+    modalTitle.textContent = content.title;
+    modalProjectDescription.textContent = content.content;
 
     if (content.link) {
-      if (modalVisitProjectButton) {
-        modalVisitProjectButton.href = content.link;
-        modalVisitProjectButton.classList.remove("hidden");
-      }
+      modalVisitProjectButton.href = content.link;
+      modalVisitProjectButton.classList.remove("hidden");
     } else {
-      if (modalVisitProjectButton) modalVisitProjectButton.classList.add("hidden");
+      modalVisitProjectButton.classList.add("hidden");
     }
-    if (modal) modal.classList.remove("hidden");
-    if (modalbgOverlay) modalbgOverlay.classList.remove("hidden");
+    modal.classList.remove("hidden");
+    modalbgOverlay.classList.remove("hidden");
     isModalOpen = true;
   }
 }
 
 function hideModal() {
   isModalOpen = false;
-  if (modal) modal.classList.add("hidden");
-  if (modalbgOverlay) modalbgOverlay.classList.add("hidden");
+  modal.classList.add("hidden");
+  modalbgOverlay.classList.add("hidden");
   if (!isMuted) {
     playSound("projectsSFX");
   }
@@ -306,7 +178,7 @@ function hideModal() {
 
 // Our Intersecting objects
 const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
+const pointer = new THREE.Vector2(); // Usado para mouse/touch
 
 let intersectObject = "";
 const intersectObjects = [];
@@ -324,7 +196,7 @@ const intersectObjectsNames = [
   "Chest",
 ];
 
-// Loading screen and loading manager
+// Loading screen and loading manager (sin cambios, ya definido)
 const loadingScreen = document.getElementById("loadingScreen");
 const loadingText = document.querySelector(".loading-text");
 const enterButton = document.querySelector(".enter-button");
@@ -333,89 +205,44 @@ const instructions = document.querySelector(".instructions");
 const manager = new THREE.LoadingManager();
 
 manager.onLoad = function () {
-  // Asegúrate de que gsap esté cargado
-  if (typeof gsap !== 'undefined') {
-    const t1 = gsap.timeline();
+  const t1 = gsap.timeline();
 
-    t1.to(loadingText, {
-      opacity: 0,
-      duration: 0,
-    });
+  t1.to(loadingText, {
+    opacity: 0,
+    duration: 0,
+  });
 
-    t1.to(enterButton, {
-      opacity: 1,
-      duration: 0,
-    });
-  } else {
-    // Si gsap no está disponible, simplemente oculta/muestra directamente
-    if (loadingText) loadingText.style.opacity = '0';
-    if (enterButton) enterButton.style.opacity = '1';
-  }
+  t1.to(enterButton, {
+    opacity: 1,
+    duration: 0,
+  });
 };
 
-if (enterButton) {
-  enterButton.addEventListener("click", () => {
-    // Only hide loading screen if not in VR
-    if (!vrEnabled) {
-      if (typeof gsap !== 'undefined' && loadingScreen) {
-        gsap.to(loadingScreen, {
-          opacity: 0,
-          duration: 0,
-        });
-        gsap.to(instructions, {
-          opacity: 0,
-          duration: 0,
-          onComplete: () => {
-            loadingScreen.remove();
-          },
-        });
-      } else if (loadingScreen) {
-        loadingScreen.style.opacity = '0';
-        if (instructions) instructions.style.opacity = '0';
-        loadingScreen.remove();
-      }
-    }
-
-    if (!isMuted) {
-      playSound("projectsSFX");
-      playSound("backgroundMusic");
-    }
+enterButton.addEventListener("click", () => {
+  gsap.to(loadingScreen, {
+    opacity: 0,
+    duration: 0,
   });
-}
+  gsap.to(instructions, {
+    opacity: 0,
+    duration: 0,
+    onComplete: () => {
+      loadingScreen.remove();
+    },
+  });
 
-// Audio
+  if (!isMuted) {
+    playSound("projectsSFX");
+    playSound("backgroundMusic");
+  }
+});
 
-// GLTF Loader
+// GLTF Loader (sin cambios, ya definido)
 const loader = new GLTFLoader(manager);
 
 loader.load(
   "./Portfolio.glb",
   function (glb) {
-    // --- INICIO: CAMBIOS SUGERIDOS PARA LA ESCALA Y DEPURACIÓN ---
-
-    // 1. **Ajusta la escala de todo el escenario GLB:**
-    //    Este es el cambio más importante. Prueba con diferentes valores.
-    //    - Si el escenario es demasiado GRANDE, usa un valor menor que 1 (ej. 0.1, 0.01).
-    //      Un valor de 0.1 significa que el escenario será 10 veces más pequeño.
-    //    - Si el escenario es demasiado PEQUEÑO (menos común), usa un valor mayor que 1 (ej. 10, 100).
-    const SCENE_SCALE_FACTOR = 0.1; // <<< COMIENZA AQUÍ, PRUEBA 0.01 O 0.001 SI AÚN ES MUY GRANDE
-    glb.scene.scale.set(SCENE_SCALE_FACTOR, SCENE_SCALE_FACTOR, SCENE_SCALE_FACTOR);
-
-    // 2. **Añade una caja de depuración TEMPORAL:**
-    //    Esta caja te ayudará a confirmar si el GLB se está cargando y si la escala es correcta.
-    //    Si ves la caja verde, significa que el GLB se carga y la escala está bien,
-    //    y el problema podría ser con los materiales o las luces de tu modelo real.
-    //    ¡Recuerda ELIMINAR este código una vez que tu escenario se vea!
-    const debugBox = new THREE.Mesh(
-      new THREE.BoxGeometry(2, 2, 2), // Una caja de 2x2x2 metros
-      new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }) // Verde y de alambre
-    );
-    debugBox.position.set(0, 1.7, -3); // Posiciona la caja a la altura de los ojos (1.7m) y 3m hacia adelante.
-    glb.scene.add(debugBox); // Añádela a la escena GLB para que se escale con ella.
-
-    // --- FIN: CAMBIOS SUGERIDOS PARA LA ESCALA Y DEPURACIÓN ---
-
-
     glb.scene.traverse((child) => {
       if (intersectObjectsNames.includes(child.name)) {
         intersectObjects.push(child);
@@ -444,11 +271,11 @@ loader.load(
   },
   undefined,
   function (error) {
-    console.error(error); // MUY IMPORTANTE: Revisa la consola en chrome://inspect para ver errores aquí
+    console.error(error);
   }
 );
 
-// Lighting and Enviornment Stuff
+// Lighting and Enviornment Stuff (sin cambios, ya definido)
 const sun = new THREE.DirectionalLight(0xffffff);
 sun.castShadow = true;
 sun.position.set(280, 200, -80);
@@ -466,41 +293,41 @@ scene.add(sun);
 const light = new THREE.AmbientLight(0x404040, 2.7);
 scene.add(light);
 
-// Camera Stuff - This will be the desktop camera. In VR, xrCamera will be used.
-const aspect = sizes.width / sizes.height;
-const camera = new THREE.OrthographicCamera(
-  -aspect * 50,
-  aspect * 50,
-  50,
-  -50,
-  1,
+// --- CÁMARA: CAMBIO CRÍTICO PARA VR ---
+// La cámara de Three.js para VR es de tipo PerspectiveCamera.
+// La posición y rotación son manejadas por el casco VR.
+// Mantendremos una cámara "normal" para el modo de escritorio,
+// pero el renderizador usará la cámara VR cuando la sesión esté activa.
+const camera = new THREE.PerspectiveCamera(
+  75,
+  sizes.width / sizes.height,
+  0.1,
   1000
 );
 
-camera.position.x = -13;
-camera.position.y = 39;
-camera.position.z = -67;
+// Posición inicial de la cámara en modo de escritorio.
+// En VR, esta posición será ignorada y reemplazada por la del casco.
+camera.position.set(
+  character.spawnPosition.x - 13, // Ajusta estas posiciones para que la vista inicial sea buena
+  character.spawnPosition.y + 39,
+  character.spawnPosition.z - 67
+);
+camera.lookAt(character.spawnPosition); // Que la cámara mire al punto de inicio del personaje
 
-const cameraOffset = new THREE.Vector3(-13, 39, -67);
+// NO USAR OrthographicCamera en VR.
 
-camera.zoom = 2.2;
-camera.updateProjectionMatrix();
-
-const controls = new OrbitControls(camera, canvas); // Keep for desktop mode
+// Los OrbitControls son útiles para depuración en desktop, pero no para VR.
+const controls = new OrbitControls(camera, canvas);
 controls.update();
 
-// Handle when window resizes
+// Handle when window resizes (modificado para WebXR)
 function onResize() {
   sizes.width = window.innerWidth;
   sizes.height = window.innerHeight;
-  const aspect = sizes.width / sizes.height;
 
-  // Only update the perspective camera if not in VR
-  if (!vrEnabled) {
-    camera.left = -aspect * 50;
-    camera.right = aspect * 50;
-    camera.top = 50;
-    camera.bottom = -50;
+  // Ajusta la cámara solo si no estamos en una sesión XR
+  if (!renderer.xr.isPresenting) {
+    camera.aspect = sizes.width / sizes.height;
     camera.updateProjectionMatrix();
   }
 
@@ -508,14 +335,13 @@ function onResize() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 }
 
-// Interact with Objects and Raycaster
+// Interact with Objects and Raycaster (sin cambios, ya definido)
 let isCharacterReady = true;
 
 function jumpCharacter(meshID) {
   if (!isCharacterReady) return;
 
   const mesh = scene.getObjectByName(meshID);
-  if (!mesh) return; // Añadido: asegurar que el mesh existe
   const jumpHeight = 2;
   const jumpDuration = 0.5;
   const isSnorlax = meshID === "Snorlax";
@@ -525,11 +351,6 @@ function jumpCharacter(meshID) {
     y: mesh.scale.y,
     z: mesh.scale.z,
   };
-
-  if (typeof gsap === 'undefined') {
-    console.warn("GSAP is not loaded. Jump animation will not play.");
-    return;
-  }
 
   const t1 = gsap.timeline();
 
@@ -591,25 +412,42 @@ function jumpCharacter(meshID) {
   }
 }
 
+// Modificado para VR: El clic/interacción en VR será diferente
 function onClick() {
-  if (touchHappened) return;
-  handleInteraction();
+    // Si estamos en VR, la interacción con el raycaster será diferente
+    if (renderer.xr.isPresenting) {
+        // En VR, las interacciones generalmente se manejan con controladores VR.
+        // Aquí podrías agregar lógica para un "clic" en VR si tu raycaster
+        // se actualiza en base a la dirección de la cabeza o de un controlador.
+        // Por ahora, dejamos este clic de navegador para el modo desktop.
+        // No se recomienda usar eventos de mouse directamente en VR.
+        return; // Ignora clics de mouse en modo VR
+    }
+    // Lógica existente para el modo de escritorio
+    if (touchHappened) return;
+    handleInteraction();
 }
 
+// Modificado para VR: handleInteraction necesitará considerar la cámara VR
 function handleInteraction() {
-  if (modal && !modal.classList.contains("hidden")) { // Asegurar que 'modal' existe y no está oculto
+  if (!modal.classList.contains("hidden")) {
     return;
   }
 
-  // --- Interaction in VR vs Desktop ---
-  let currentCamera = vrEnabled ? xrCamera : camera; // Usa la cámara apropiada
-  if (!currentCamera) return; // Asegurar que la cámara existe
+  // Si estamos en VR, la raycaster debería basarse en la cámara VR o un controlador
+  if (renderer.xr.isPresenting) {
+    // Para VR, necesitas un raycaster que siga la mirada del usuario (headset)
+    // o un controlador de mano. Para una interacción simple de "mirar y activar",
+    // puedes usar la cámara VR.
 
-  // *** Para interacción en VR, podrías querer usar raycasting desde los controladores de mano ***
-  // Por ahora, se mantiene el raycasting desde el "pointer" (ratón/toque),
-  // pero en VR el "pointer" siempre estará en el centro de la vista a menos que lo ajustes.
-  // Podrías necesitar un raycaster diferente para los controladores de mano.
-  raycaster.setFromCamera(pointer, currentCamera);
+    // Obtener la pose de la cámara VR actual
+    const xrCamera = renderer.xr.getCamera(camera);
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), xrCamera); // El centro de la vista
+  } else {
+    // Modo de escritorio (mouse/touch)
+    raycaster.setFromCamera(pointer, camera);
+  }
+
   const intersects = raycaster.intersectObjects(intersectObjects);
 
   if (intersects.length > 0) {
@@ -647,30 +485,32 @@ function handleInteraction() {
   }
 }
 
+// onMouseMove, onTouchEnd, onKeyDown, onKeyUp, mobileControls:
+// Estos eventos de entrada de escritorio/móvil no se usarán directamente en VR.
+// Manténgalos para el modo 2D, pero considera cómo manejar el movimiento en VR.
+// Por ahora, en VR, tu personaje se quedará quieto hasta que implementes controles VR.
+
 function onMouseMove(event) {
+  if (renderer.xr.isPresenting) return; // Ignorar en VR
   pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
   pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
   touchHappened = false;
 }
 
 function onTouchEnd(event) {
-  // Para touch, event.changedTouches[0] es más fiable para obtener la posición del toque
-  if (event.changedTouches && event.changedTouches.length > 0) {
-    pointer.x = (event.changedTouches[0].clientX / window.innerWidth) * 2 - 1;
-    pointer.y = -(event.changedTouches[0].clientY / window.innerHeight) * 2 + 1;
-  } else {
-    // Fallback para otros eventos de puntero si es necesario
-    pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-    pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
-  }
+  if (renderer.xr.isPresenting) return; // Ignorar en VR
+  pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
   touchHappened = true;
   handleInteraction();
 }
 
-// Movement and Gameplay functions
+// Movement and Gameplay functions (estas funciones controlan el movimiento del personaje)
+// En VR, necesitarás una forma diferente de mover al personaje,
+// probablemente usando los controladores de VR (ej. teleportación o joysticks virtuales).
+// Por ahora, el personaje se quedará en su posición de spawn si no hay controles VR implementados.
 function respawnCharacter() {
-  if (!character.instance) return; // Asegurarse de que el personaje existe
   character.instance.position.copy(character.spawnPosition);
 
   playerCollider.start
@@ -681,26 +521,26 @@ function respawnCharacter() {
     .add(new THREE.Vector3(0, CAPSULE_HEIGHT, 0));
 
   playerVelocity.set(0, 0, 0);
-  playerOnFloor = false; // Reset playerOnFloor state
   character.isMoving = false;
 }
 
 function playerCollisions() {
   const result = colliderOctree.capsuleIntersect(playerCollider);
-  playerOnFloor = false; // Reset before checking
+  playerOnFloor = false;
 
   if (result) {
     playerOnFloor = result.normal.y > 0;
     playerCollider.translate(result.normal.multiplyScalar(result.depth));
 
     if (playerOnFloor) {
+      character.isMoving = false;
       playerVelocity.x = 0;
       playerVelocity.z = 0;
     }
   }
 }
 
-function updatePlayer(delta) {
+function updatePlayer() {
   if (!character.instance) return;
 
   if (character.instance.position.y < -20) {
@@ -708,54 +548,36 @@ function updatePlayer(delta) {
     return;
   }
 
-  // Apply gravity
+  // --- Movimiento del personaje para VR ---
+  // Si estamos en VR, la cámara del headset es el punto de vista del usuario.
+  // Queremos que el *personaje* se mueva, y la cámara VR se adjuntará al personaje.
+  // Esto requiere que el personaje sea un padre de la cámara, o que la cámara se mueva con el personaje.
+  // Para simplificar, haremos que el `character.instance` (tu personaje) sea la cámara raíz en VR.
+  // Esto significa que el personaje se moverá y la vista VR se moverá con él.
+
+  // En modo VR, la posición del character.instance se convertirá en la posición
+  // desde la cual se renderizará el mundo, es decir, será el "playerRig".
+  // Si no tienes un "playerRig" explícito, puedes mover la escena o el propio character.instance.
+
+  // Por ahora, el movimiento de la cápsula y la colisión se aplicará al character.instance.
+  // La cámara VR de Three.js (renderer.xr.getCamera(camera)) se moverá con el character.instance.
+  // Esto hará que el personaje sea el "cuerpo" del jugador en VR.
+
   if (!playerOnFloor) {
-    playerVelocity.y -= GRAVITY * delta;
+    playerVelocity.y -= GRAVITY * 0.035;
   }
 
-  // Update player collider based on velocity
-  playerCollider.translate(playerVelocity.clone().multiplyScalar(delta));
+  // Aplica la velocidad a la cápsula del jugador
+  playerCollider.translate(playerVelocity.clone().multiplyScalar(0.035));
 
-  playerCollisions(); // Check for collisions after moving
+  playerCollisions();
 
-  // Update character instance position from collider
-  // En VR, el character.instance es hijo de dummyCamera, así que su posición es local.
-  // En desktop, es global.
-  if (!vrEnabled) {
-    character.instance.position.copy(playerCollider.start);
-    character.instance.position.y -= CAPSULE_RADIUS;
-  }
+  // Mueve la instancia del personaje a la posición de la cápsula
+  character.instance.position.copy(playerCollider.start);
+  character.instance.position.y -= CAPSULE_RADIUS; // Ajuste para que el personaje esté sobre el suelo
 
-
-  // --- VR Movement Integration (Conceptual) ---
-  if (vrEnabled) {
-    // En VR, la posición del dummyCamera se usa para mantener la posición del personaje
-    // El dummyCamera sigue al playerCollider.
-    dummyCamera.position.copy(playerCollider.start);
-    dummyCamera.position.y -= CAPSULE_RADIUS; // Ajusta para la base de la cápsula
-
-    // *** Aquí es donde integrarías la lógica de movimiento específica para VR ***
-    // Por ejemplo, usando los gamepads de los controladores:
-    // if (hand1 && hand1.gamepad) {
-    //    const forward = new THREE.Vector3(0, 0, -1);
-    //    forward.applyQuaternion(hand1.quaternion); // Obtén la dirección hacia adelante del controlador
-    //    forward.y = 0; // Solo movimiento horizontal
-    //    forward.normalize();
-
-    //    // Asume que el eje Y del joystick es el movimiento adelante/atrás
-    //    const joystickY = hand1.gamepad.axes[3]; // O el eje correspondiente en tu controlador
-    //    if (Math.abs(joystickY) > 0.1) { // Pequeño deadzone
-    //        playerCollider.translate(forward.multiplyScalar(joystickY * MOVE_SPEED * delta)); // delta viene de animate
-    //        character.isMoving = true;
-    //    } else {
-    //        character.isMoving = false;
-    //    }
-    // }
-    // Podrías rotar el dummyCamera o mover playerCollider
-    // en función de la entrada del controlador.
-
-  } else {
-    // Existing desktop rotation logic
+  // Rotación del personaje (solo si no estamos en VR, o si el movimiento es con joystick)
+  if (!renderer.xr.isPresenting) {
     let rotationDiff =
       ((((targetRotation - character.instance.rotation.y) % (2 * Math.PI)) +
         3 * Math.PI) %
@@ -768,73 +590,66 @@ function updatePlayer(delta) {
       finalRotation,
       0.4
     );
+  } else {
+    // En VR, la rotación horizontal del personaje debería seguir la rotación del headset
+    // para evitar que el mundo gire de forma independiente de la cabeza del usuario.
+    // Opcionalmente, puedes permitir que el joystick gire el personaje.
+    // Por ahora, simplemente evita que el personaje gire automáticamente como en 2D.
   }
 }
 
+// onKeyDown y onKeyUp: Controlan el movimiento con teclado.
+// Estos eventos solo deben afectar el movimiento si NO estamos en VR.
 function onKeyDown(event) {
+  if (renderer.xr.isPresenting) return; // Ignorar en VR
   if (event.code.toLowerCase() === "keyr") {
     respawnCharacter();
     return;
   }
 
-  // Only respond to keyboard input if not in VR
-  if (!vrEnabled) {
-    switch (event.code.toLowerCase()) {
-      case "keyw":
-      case "arrowup":
-        pressedButtons.up = true;
-        break;
-      case "keys":
-      case "arrowdown":
-        pressedButtons.down = true;
-        break;
-      case "keya":
-      case "arrowleft":
-        pressedButtons.left = true;
-        break;
-      case "keyd":
-      case "arrowright":
-        pressedButtons.right = true;
-        break;
-      case "space": // Added spacebar for jump on desktop
-        if (playerOnFloor) {
-          playerVelocity.y = JUMP_HEIGHT;
-          if (!isMuted) {
-            playSound("jumpSFX");
-          }
-          character.isMoving = true;
-          handleJumpAnimation();
-        }
-        break;
-    }
+  switch (event.code.toLowerCase()) {
+    case "keyw":
+    case "arrowup":
+      pressedButtons.up = true;
+      break;
+    case "keys":
+    case "arrowdown":
+      pressedButtons.down = true;
+      break;
+    case "keya":
+    case "arrowleft":
+      pressedButtons.left = true;
+      break;
+    case "keyd":
+    case "arrowright":
+      pressedButtons.right = true;
+      break;
   }
 }
 
 function onKeyUp(event) {
-  // Only respond to keyboard input if not in VR
-  if (!vrEnabled) {
-    switch (event.code.toLowerCase()) {
-      case "keyw":
-      case "arrowup":
-        pressedButtons.up = false;
-        break;
-      case "keys":
-      case "arrowdown":
-        pressedButtons.down = false;
-        break;
-      case "keya":
-      case "arrowleft":
-        pressedButtons.left = false;
-        break;
-      case "keyd":
-      case "arrowright":
-        pressedButtons.right = false;
-        break;
-    }
+  if (renderer.xr.isPresenting) return; // Ignorar en VR
+  switch (event.code.toLowerCase()) {
+    case "keyw":
+    case "arrowup":
+      pressedButtons.up = false;
+      break;
+    case "keys":
+    case "arrowdown":
+      pressedButtons.down = false;
+      break;
+    case "keya":
+    case "arrowleft":
+      pressedButtons.left = false;
+      break;
+    case "keyd":
+    case "arrowright":
+      pressedButtons.right = false;
+      break;
   }
 }
 
-// Toggle Theme Function
+// Toggle Theme Function (sin cambios, ya definido)
 function toggleTheme() {
   if (!isMuted) {
     playSound("projectsSFX");
@@ -843,68 +658,62 @@ function toggleTheme() {
   document.body.classList.toggle("dark-theme");
   document.body.classList.toggle("light-theme");
 
-  if (firstIcon && secondIcon) { // Asegurarse de que los iconos existen
-    if (firstIcon.style.display === "none") {
-      firstIcon.style.display = "block";
-      secondIcon.style.display = "none";
-    } else {
-      firstIcon.style.display = "none";
-      secondIcon.style.display = "block";
-    }
+  if (firstIcon.style.display === "none") {
+    firstIcon.style.display = "block";
+    secondIcon.style.display = "none";
+  } else {
+    firstIcon.style.display = "none";
+    secondIcon.style.display = "block";
   }
 
-  if (typeof gsap !== 'undefined') {
-    gsap.to(light.color, {
-      r: isDarkTheme ? 1.0 : 0.25,
-      g: isDarkTheme ? 1.0 : 0.31,
-      b: isDarkTheme ? 1.0 : 0.78,
-      duration: 1,
-      ease: "power2.inOut",
-    });
+  gsap.to(light.color, {
+    r: isDarkTheme ? 1.0 : 0.25,
+    g: isDarkTheme ? 1.0 : 0.31,
+    b: isDarkTheme ? 1.0 : 0.78,
+    duration: 1,
+    ease: "power2.inOut",
+  });
 
-    gsap.to(light, {
-      intensity: isDarkTheme ? 0.8 : 0.9,
-      duration: 1,
-      ease: "power2.inOut",
-    });
+  gsap.to(light, {
+    intensity: isDarkTheme ? 0.8 : 0.9,
+    duration: 1,
+    ease: "power2.inOut",
+  });
 
-    gsap.to(sun, {
-      intensity: isDarkTheme ? 1 : 0.8,
-      duration: 1,
-      ease: "power2.inOut",
-    });
+  gsap.to(sun, {
+    intensity: isDarkTheme ? 1 : 0.8,
+    duration: 1,
+    ease: "power2.inOut",
+  });
 
-    gsap.to(sun.color, {
-      r: isDarkTheme ? 1.0 : 0.25,
-      g: isDarkTheme ? 1.0 : 0.41,
-      b: isDarkTheme ? 1.0 : 0.88,
-      duration: 1,
-      ease: "power2.inOut",
-    });
-  }
+  gsap.to(sun.color, {
+    r: isDarkTheme ? 1.0 : 0.25,
+    g: isDarkTheme ? 1.0 : 0.41,
+    b: isDarkTheme ? 1.0 : 0.88,
+    duration: 1,
+    ease: "power2.inOut",
+  });
 }
 
-// Toggle Audio Function
+// Toggle Audio Function (sin cambios, ya definido)
 function toggleAudio() {
   if (!isMuted) {
-    playSound("projectsSFX"); // Suena al activar el botón, no al mutear
+    playSound("projectsSFX");
   }
-  if (firstIconTwo && secondIconTwoElement) { // Usar secondIconTwoElement corregido
-    if (firstIconTwo.style.display === "none") {
-      firstIconTwo.style.display = "block";
-      secondIconTwoElement.style.display = "none";
-      isMuted = false;
-      sounds.backgroundMusic.play();
-    } else {
-      firstIconTwo.style.display = "none";
-      secondIconTwoElement.style.display = "block";
-      isMuted = true;
-      sounds.backgroundMusic.pause();
-    }
+  if (firstIconTwo.style.display === "none") {
+    firstIconTwo.style.display = "block";
+    secondIconTwo.style.display = "none";
+    isMuted = false;
+    sounds.backgroundMusic.play();
+  } else {
+    firstIconTwo.style.display = "none";
+    secondIconTwo.style.display = "block";
+    isMuted = true;
+    sounds.backgroundMusic.pause();
   }
 }
 
-// Mobile controls
+// Mobile controls (sin cambios, pero solo afectarán el modo desktop)
 const mobileControls = {
   up: document.querySelector(".mobile-control.up-arrow"),
   left: document.querySelector(".mobile-control.left-arrow"),
@@ -923,10 +732,8 @@ function handleJumpAnimation() {
   if (!character.instance || !character.isMoving) return;
 
   const jumpDuration = 0.5;
-  if (typeof gsap === 'undefined') {
-    console.warn("GSAP is not loaded. Jump animation will not play.");
-    return;
-  }
+  const jumpHeight = 2;
+
   const t1 = gsap.timeline();
 
   t1.to(character.instance.scale, {
@@ -961,95 +768,81 @@ function handleJumpAnimation() {
   });
 }
 
-// --- Modified handleContinuousMovement for VR considerations ---
 function handleContinuousMovement() {
+  // Solo permite movimiento con teclado/mobile si NO estamos en VR
+  if (renderer.xr.isPresenting) {
+    // Si estás en VR, aquí deberías manejar la entrada de los controladores VR
+    // para mover al personaje. Por ejemplo, usando `renderer.xr.getController(0)`
+    // y leyendo su `gamepad.axes` para joysticks.
+    return;
+  }
+
   if (!character.instance) return;
 
-  if (vrEnabled) {
-    // *** Lógica de movimiento para VR ***
-    // Aquí es donde implementarías el movimiento del jugador basado en la entrada de los controladores VR.
-    // Podrías mover el playerCollider y, por lo tanto, el dummyCamera.
-    // Esto es un tema complejo y dependerá del tipo de locomoción que quieras (teletransporte, movimiento con joystick, etc.).
-    // Por ejemplo:
-    // if (hand1 && hand1.gamepad) {
-    //    const forward = new THREE.Vector3(0, 0, -1);
-    //    forward.applyQuaternion(hand1.quaternion); // Obtén la dirección hacia adelante del controlador
-    //    forward.y = 0; // Solo movimiento horizontal
-    //    forward.normalize();
-
-    //    // Asume que el eje Y del joystick es el movimiento adelante/atrás
-    //    const joystickY = hand1.gamepad.axes[3]; // O el eje correspondiente en tu controlador
-    //    if (Math.abs(joystickY) > 0.1) { // Pequeño deadzone
-    //        playerCollider.translate(forward.multiplyScalar(joystickY * MOVE_SPEED * delta)); // delta viene de animate
-    //        character.isMoving = true;
-    //    } else {
-    //        character.isMoving = false;
-    //    }
-    // }
-  } else {
-    // Original desktop/mobile movement logic
-    if (Object.values(pressedButtons).some((pressed) => pressed)) {
-      playerVelocity.set(0, playerVelocity.y, 0); // Reinicia la velocidad horizontal en cada frame
-      if (pressedButtons.up) {
-        playerVelocity.z -= MOVE_SPEED;
-        targetRotation = 0;
-      }
-      if (pressedButtons.down) {
-        playerVelocity.z += MOVE_SPEED;
-        targetRotation = Math.PI;
-      }
-      if (pressedButtons.left) {
-        playerVelocity.x -= MOVE_SPEED;
-        targetRotation = Math.PI / 2;
-      }
-      if (pressedButtons.right) {
-        playerVelocity.x += MOVE_SPEED;
-        targetRotation = -Math.PI / 2;
-      }
-      character.isMoving = true;
-    } else {
-      character.isMoving = false;
+  if (
+    Object.values(pressedButtons).some((pressed) => pressed) &&
+    !character.isMoving
+  ) {
+    if (!isMuted) {
+      playSound("jumpSFX");
     }
+    if (pressedButtons.up) {
+      playerVelocity.z += MOVE_SPEED;
+      targetRotation = 0;
+    }
+    if (pressedButtons.down) {
+      playerVelocity.z -= MOVE_SPEED;
+      targetRotation = Math.PI;
+    }
+    if (pressedButtons.left) {
+      playerVelocity.x += MOVE_SPEED;
+      targetRotation = Math.PI / 2;
+    }
+    if (pressedButtons.right) {
+      playerVelocity.x -= MOVE_SPEED;
+      target.rotation = -Math.PI / 2;
+    }
+
+    playerVelocity.y = JUMP_HEIGHT;
+    character.isMoving = true;
+    handleJumpAnimation();
   }
 }
 
-// Disable mobile controls for VR mode if active
 Object.entries(mobileControls).forEach(([direction, element]) => {
-  if (element) { // Asegurarse de que el elemento existe
-    element.addEventListener("touchstart", (e) => {
-      if (vrEnabled) return; // Ignore if in VR
-      e.preventDefault();
-      pressedButtons[direction] = true;
-    });
+  element.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    if (renderer.xr.isPresenting) return; // Ignorar en VR
+    pressedButtons[direction] = true;
+  });
 
-    element.addEventListener("touchend", (e) => {
-      if (vrEnabled) return; // Ignore if in VR
-      e.preventDefault();
-      pressedButtons[direction] = false;
-    });
+  element.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    if (renderer.xr.isPresenting) return; // Ignorar en VR
+    pressedButtons[direction] = false;
+  });
 
-    element.addEventListener("mousedown", (e) => {
-      if (vrEnabled) return; // Ignore if in VR
-      e.preventDefault();
-      pressedButtons[direction] = true;
-    });
+  element.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    if (renderer.xr.isPresenting) return; // Ignorar en VR
+    pressedButtons[direction] = true;
+  });
 
-    element.addEventListener("mouseup", (e) => {
-      if (vrEnabled) return; // Ignore if in VR
-      e.preventDefault();
-      pressedButtons[direction] = false;
-    });
+  element.addEventListener("mouseup", (e) => {
+    e.preventDefault();
+    if (renderer.xr.isPresenting) return; // Ignorar en VR
+    pressedButtons[direction] = false;
+  });
 
-    element.addEventListener("mouseleave", (e) => {
-      if (vrEnabled) return; // Ignore if in VR
-      pressedButtons[direction] = false;
-    });
+  element.addEventListener("mouseleave", (e) => {
+    if (renderer.xr.isPresenting) return; // Ignorar en VR
+    pressedButtons[direction] = false;
+  });
 
-    element.addEventListener("touchcancel", (e) => {
-      if (vrEnabled) return; // Ignore if in VR
-      pressedButtons[direction] = false;
-    });
-  }
+  element.addEventListener("touchcancel", (e) => {
+    if (renderer.xr.isPresenting) return; // Ignorar en VR
+    pressedButtons[direction] = false;
+  });
 });
 
 window.addEventListener("blur", () => {
@@ -1059,10 +852,10 @@ window.addEventListener("blur", () => {
 });
 
 // Adding Event Listeners
-if (modalExitButton) modalExitButton.addEventListener("click", hideModal);
-if (modalbgOverlay) modalbgOverlay.addEventListener("click", hideModal);
-if (themeToggleButton) themeToggleButton.addEventListener("click", toggleTheme);
-if (audioToggleButton) audioToggleButton.addEventListener("click", toggleAudio);
+modalExitButton.addEventListener("click", hideModal);
+modalbgOverlay.addEventListener("click", hideModal);
+themeToggleButton.addEventListener("click", toggleTheme);
+audioToggleButton.addEventListener("click", toggleAudio);
 window.addEventListener("resize", onResize);
 window.addEventListener("click", onClick, { passive: false });
 window.addEventListener("mousemove", onMouseMove);
@@ -1070,17 +863,21 @@ window.addEventListener("touchend", onTouchEnd, { passive: false });
 window.addEventListener("keydown", onKeyDown);
 window.addEventListener("keyup", onKeyUp);
 
-const clock = new THREE.Clock(); // For frame-rate independent physics
+// --- INICIALIZACIÓN DEL BOTÓN VR ---
+// Asegúrate de que el botón se cree DESPUÉS de que el renderer esté configurado
+document
+  .getElementById("vr-button-container")
+  .appendChild(VRButton.createButton(renderer));
 
+// --- Bucle de Animación para VR ---
+// Three.js se encargará de llamar a `animate` en el momento adecuado para VR.
 function animate() {
-  const delta = Math.min(0.05, clock.getDelta()); // Limit delta to prevent physics glitches
+  updatePlayer();
+  handleContinuousMovement(); // Esto ahora solo afecta el modo desktop
 
-  updatePlayer(delta); // Pass delta to physics update
-  handleContinuousMovement(); // This will handle VR movement if vrEnabled is true
-
-  // --- Camera Update Logic (Conditional) ---
-  if (!vrEnabled) {
-    // Only update the OrthographicCamera for desktop view
+  // La lógica de la cámara cambia dependiendo si estamos en VR o no
+  if (!renderer.xr.isPresenting) {
+    // Lógica de cámara para modo de escritorio
     if (character.instance) {
       const targetCameraPosition = new THREE.Vector3(
         character.instance.position.x + cameraOffset.x - 20,
@@ -1090,34 +887,41 @@ function animate() {
       camera.position.copy(targetCameraPosition);
       camera.lookAt(
         character.instance.position.x + 10,
-        camera.position.y - 39,
-        character.instance.position.z // Z component was missing here
+        character.instance.position.y, // Ajustado para que mire al personaje
+        character.instance.position.z + 10
       );
     }
+  } else {
+    // Lógica para VR: La cámara del headset ya está siendo controlada por Three.js.
+    // Necesitas adjuntar la cámara al personaje o mover el personaje según el headset.
+    // Una forma común es que el `character.instance` sea el "rig" del jugador
+    // y el `renderer.xr.getCamera(camera)` esté dentro de ese rig.
+
+    // Si tu personaje (character.instance) se mueve en el mundo, la cámara VR
+    // automáticamente se moverá con él si está adjunta.
+    // Aquí, estamos moviendo el `character.instance` en `updatePlayer()`.
+    // La cámara VR de Three.js (la que está siendo renderizada) se moverá con este `character.instance`.
+    // Puedes también hacer que el `character.instance` rote con la rotación horizontal del headset.
+    // Esto es un punto crucial para futuros controles de movimiento VR.
   }
 
-  // Define buildController for VR controller visualization (if not already defined)
-  // This is a basic example. You might have your own 3D models for controllers.
-  function buildController( data ) {
-    let geometry, material;
-    switch ( data.targetRayMode ) {
-      case 'tracked-pointer':
-        geometry = new THREE.BufferGeometry();
-        geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ 0, 0, 0, 0, 0, - 1 ], 3 ) );
-        geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( [ 0.5, 0.5, 0.5, 0, 0, 0 ], 3 ) );
-        material = new THREE.LineBasicMaterial( { vertexColors: true, blending: THREE.AdditiveBlending } );
-        return new THREE.Line( geometry, material );
-      case 'gaze':
-        geometry = new THREE.RingGeometry( 0.02, 0.04, 32 ).translate( 0, 0, - 1 );
-        material = new THREE.MeshBasicMaterial( { opacity: 0.5, transparent: true } );
-        return new THREE.Mesh( geometry, material );
+  // El raycasting para interacción se llama en `handleInteraction()`
+  // La visualización del cursor del mouse solo debe ocurrir en el modo de escritorio
+  if (!renderer.xr.isPresenting) {
+    raycaster.setFromCamera(pointer, camera);
+    const intersects = raycaster.intersectObjects(intersectObjects);
+
+    if (intersects.length > 0) {
+      document.body.style.cursor = "pointer";
+    } else {
+      document.body.style.cursor = "default";
+      intersectObject = ""; // Restablecer cuando no hay intersecciones
     }
+  } else {
+    // En VR, no hay cursor de mouse. La retroalimentación de interacción sería visual (ej. un rayo láser desde el controlador)
+    document.body.style.cursor = "default"; // Asegúrate de que el cursor no esté como "pointer" en VR
   }
-
-
-  renderer.setAnimationLoop(animate); // IMPORTANT: Keep this at the end of animate()
-  renderer.render(scene, vrEnabled ? xrCamera : camera);
 }
 
-// Start the animation loop
-animate();
+// Este es el nuevo bucle de animación. ¡Reemplaza tu `renderer.setAnimationLoop(animate);`!
+renderer.setAnimationLoop(animate);
