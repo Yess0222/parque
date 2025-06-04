@@ -44,13 +44,13 @@
       <canvas id="experience-canvas"></canvas>
     </div>
 
-    <div class="loading-screen" id="loadingScreen">
+    <div class="loading-screen ui-overlay" id="loadingScreen">
       <div class="loading-text">Loading...</div>
       <button class="enter-button">Enter Park!</button>
       <div class="instructions">~ use arrow keys to move ~</div>
     </div>
 
-    <div class="theme-mode-toggle-button">
+    <div class="theme-mode-toggle-button ui-overlay">
       <svg
         width="80"
         height="80"
@@ -127,7 +127,7 @@
       </svg>
     </div>
 
-    <div class="audio-toggle-button">
+    <div class="audio-toggle-button ui-overlay">
       <svg
         width="102"
         height="69"
@@ -155,8 +155,8 @@
       </svg>
     </div>
 
-    <div class="modal-bg-overlay hidden"></div>
-    <div class="modal hidden">
+    <div class="modal-bg-overlay hidden ui-overlay"></div>
+    <div class="modal hidden ui-overlay">
       <div class="modal-wrapper">
         <div class="modal-header">
           <h1 class="modal-title">Project One</h1>
@@ -194,7 +194,7 @@
       </div>
     </div>
 
-    <div class="mobile-control up-arrow">
+    <div class="mobile-control up-arrow ui-overlay">
       <svg
         width="45"
         height="34"
@@ -252,7 +252,7 @@
       </svg>
     </div>
 
-    <div class="mobile-control left-arrow">
+    <div class="mobile-control left-arrow ui-overlay">
       <svg
         width="45"
         height="34"
@@ -309,65 +309,7 @@
         />
       </svg>
     </div>
-    <div class="mobile-control right-arrow">
-      <svg
-        width="45"
-        height="34"
-        viewBox="0 0 45 34"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <rect
-          x="11.7988"
-          y="17.072"
-          width="5.64259"
-          height="20.7622"
-          transform="rotate(-90 11.7988 17.072)"
-          fill="#FEFEFE"
-        />
-        <rect
-          x="7.68359"
-          y="22.7148"
-          width="5.64259"
-          height="28.811"
-          transform="rotate(-90 7.68359 22.7148)"
-          fill="#FEFEFE"
-        />
-        <rect
-          x="3.93311"
-          y="28.3574"
-          width="5.64259"
-          height="37.0427"
-          transform="rotate(-90 3.93311 28.3574)"
-          fill="#FEFEFE"
-        />
-        <rect
-          y="34"
-          width="5.64259"
-          height="45"
-          transform="rotate(-90 0 34)"
-          fill="#FEFEFE"
-        />
-        <rect
-          x="15.5488"
-          y="11.4297"
-          width="5.64259"
-          height="13.3537"
-          transform="rotate(-90 15.5488 11.4297)"
-          fill="#FEFEFE"
-        />
-        <rect
-          x="19.0244"
-          y="5.78711"
-          width="5.64259"
-          height="6.31098"
-          transform="rotate(-90 19.0244 5.78711)"
-          fill="#FEFEFE"
-        />
-      </svg>
-    </div>
-
-    <div class="mobile-control down-arrow">
+    <div class="mobile-control right-arrow ui-overlay">
       <svg
         width="45"
         height="34"
@@ -425,9 +367,65 @@
       </svg>
     </div>
 
-    <div id="vr-button-container"></div> 
+    <div class="mobile-control down-arrow ui-overlay">
+      <svg
+        width="45"
+        height="34"
+        viewBox="0 0 45 34"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect
+          x="11.7988"
+          y="17.072"
+          width="5.64259"
+          height="20.7622"
+          transform="rotate(-90 11.7988 17.072)"
+          fill="#FEFEFE"
+        />
+        <rect
+          x="7.68359"
+          y="22.7148"
+          width="5.64259"
+          height="28.811"
+          transform="rotate(-90 7.68359 22.7148)"
+          fill="#FEFEFE"
+        />
+        <rect
+          x="3.93311"
+          y="28.3574"
+          width="5.64259"
+          height="37.0427"
+          transform="rotate(-90 3.93311 28.3574)"
+          fill="#FEFEFE"
+        />
+        <rect
+          y="34"
+          width="5.64259"
+          height="45"
+          transform="rotate(-90 0 34)"
+          fill="#FEFEFE"
+        />
+        <rect
+          x="15.5488"
+          y="11.4297"
+          width="5.64259"
+          height="13.3537"
+          transform="rotate(-90 15.5488 11.4297)"
+          fill="#FEFEFE"
+        />
+        <rect
+          x="19.0244"
+          y="5.78711"
+          width="5.64259"
+          height="6.31098"
+          transform="rotate(-90 19.0244 5.78711)"
+          fill="#FEFEFE"
+        />
+      </svg>
+    </div>
 
-    <script type="importmap">
+    <div id="vr-button-container" class="ui-overlay"></div> <script type="importmap">
       {
         "imports": {
           "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
@@ -435,10 +433,10 @@
         }
       }
     </script>
-    
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-    
+
     <script type="module" src="./main.js"></script>
   </body>
 </html>
